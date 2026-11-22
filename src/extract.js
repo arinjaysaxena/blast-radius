@@ -42,7 +42,7 @@ function signatureOf(checker, symbol, node) {
     const declared = checker.getDeclaredTypeOfSymbol(resolved);
     const members = checker
       .getPropertiesOfType(declared)
-      .map((p) => `${p.name}: ${checker.typeToString(checker.getTypeOfSymbolAtLocation(p, decl), decl, flags)}`)
+      .map((p) => `${p.name}${p.flags & ts.SymbolFlags.Optional ? '?' : ''}: ${checker.typeToString(checker.getTypeOfSymbolAtLocation(p, decl), decl, flags)}`)
       .sort();
     const ctor = kind === 'class' ? type.getConstructSignatures().map((s) => `new ${checker.signatureToString(s, decl, flags)}`) : [];
     if (kind === 'type' && !members.length) return checker.typeToString(declared, decl, flags);
