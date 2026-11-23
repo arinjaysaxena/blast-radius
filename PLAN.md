@@ -24,8 +24,8 @@
 - [x] Rename detection heuristic (same signature, similar name)
 
 ### 2026-11-27 - call sites
-- [ ] Project scanner: resolve imports from the package, find usages via the checker
-- [ ] Map diff entries to call sites with file:line
+- [x] Project scanner: resolve imports from the package, find usages via the checker
+- [x] Map diff entries to call sites with file:line
 
 ### 2026-11-29 - CLI + report
 - [ ] CLI wiring, `pkg@version` fetching via npm pack (injectable)
