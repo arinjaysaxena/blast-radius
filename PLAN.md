@@ -16,7 +16,7 @@
 - [x] Public API extractor over in-memory TS sources (exports + signatures)
 
 ### 2026-11-24 - extraction
-- [ ] Extractor for a package directory (package.json types/exports resolution)
+- [x] Extractor for a package directory (package.json types/exports resolution)
 - [ ] Classes, interfaces, enums, type aliases, re-exports, default exports
 
 ### 2026-11-25 - diff

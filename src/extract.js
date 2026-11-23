@@ -51,21 +51,10 @@ function signatureOf(checker, symbol, node) {
   return checker.typeToString(type, decl, flags);
 }
 
-/**
- * Extract exports from TS source text. `files` may add extra modules ({ '/other.ts': '...' })
- * that the entry can import from. Returns { name: { kind, signature } } sorted by name.
- */
-export function extractApi(source, files = {}) {
-  const all = { ...files, [ENTRY]: source };
-  const host = ts.createCompilerHost(OPTIONS);
-  host.getSourceFile = (name, lang) => (name in all ? ts.createSourceFile(name, all[name], lang, true) : undefined);
-  host.fileExists = (name) => name in all;
-  host.readFile = (name) => all[name];
-  host.getDefaultLibFileName = () => '/lib.d.ts';
-  const program = ts.createProgram({ rootNames: Object.keys(all), options: OPTIONS, host });
+function apiFromProgram(program, entry) {
   const checker = program.getTypeChecker();
-  const sf = program.getSourceFile(ENTRY);
-  const moduleSymbol = checker.getSymbolAtLocation(sf);
+  const sf = program.getSourceFile(entry);
+  const moduleSymbol = sf && checker.getSymbolAtLocation(sf);
   const api = {};
   if (!moduleSymbol) return api;
   for (const sym of checker.getExportsOfModule(moduleSymbol).sort((a, b) => a.name.localeCompare(b.name))) {
@@ -73,4 +62,31 @@ export function extractApi(source, files = {}) {
     api[sym.name] = { kind: kindOf(target), signature: signatureOf(checker, sym, sf) };
   }
   return api;
+}
+
+function memoryProgram(all, options) {
+  const host = ts.createCompilerHost(options);
+  host.getSourceFile = (name, lang) => (name in all ? ts.createSourceFile(name, all[name], lang, true) : undefined);
+  host.fileExists = (name) => name in all;
+  host.readFile = (name) => all[name];
+  host.directoryExists = (dir) => Object.keys(all).some((f) => f.startsWith(dir.endsWith('/') ? dir : `${dir}/`));
+  host.getDefaultLibFileName = () => '/lib.d.ts';
+  return host;
+}
+
+/**
+ * Extract exports from TS source text. `files` may add extra modules ({ '/other.ts': '...' })
+ * that the entry can import from. Returns { name: { kind, signature } } sorted by name.
+ */
+export function extractApi(source, files = {}) {
+  const all = { ...files, [ENTRY]: source };
+  const host = memoryProgram(all, OPTIONS);
+  return apiFromProgram(ts.createProgram({ rootNames: Object.keys(all), options: OPTIONS, host }), ENTRY);
+}
+
+/** Extract the API from in-memory files ({ '/index.d.ts': '...' }) starting at `entry`, resolving relative imports. */
+export function extractApiFromFiles(files, entry) {
+  const options = { ...OPTIONS, noResolve: false };
+  const host = memoryProgram(files, options);
+  return apiFromProgram(ts.createProgram({ rootNames: [entry], options, host }), entry);
 }
