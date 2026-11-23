@@ -17,7 +17,7 @@
 
 ### 2026-11-24 - extraction
 - [x] Extractor for a package directory (package.json types/exports resolution)
-- [ ] Classes, interfaces, enums, type aliases, re-exports, default exports
+- [x] Classes, interfaces, enums, type aliases, re-exports, default exports
 
 ### 2026-11-25 - diff
 - [ ] Diff engine: added / removed / changed with breaking classification

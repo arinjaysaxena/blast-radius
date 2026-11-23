@@ -38,12 +38,31 @@ function signatureOf(checker, symbol, node) {
       .join(' | ');
   }
   if (kind === 'type' && ts.isTypeAliasDeclaration(decl)) return decl.type.getText().replace(/\s+/g, ' ');
-  if (kind === 'class' || kind === 'interface' || kind === 'enum' || kind === 'type') {
-    const declared = checker.getDeclaredTypeOfSymbol(resolved);
-    const members = checker
-      .getPropertiesOfType(declared)
-      .map((p) => `${p.name}${p.flags & ts.SymbolFlags.Optional ? '?' : ''}: ${checker.typeToString(checker.getTypeOfSymbolAtLocation(p, decl), decl, flags)}`)
+  if (kind === 'enum') {
+    const members = [...(resolved.exports?.values() ?? [])]
+      .map((m) => `${m.name}=${m.valueDeclaration && ts.isEnumMember(m.valueDeclaration) ? JSON.stringify(checker.getConstantValue(m.valueDeclaration)) : ''}`)
       .sort();
+    return `enum { ${members.join('; ')} }`;
+  }
+  if (kind === 'namespace') {
+    const members = checker
+      .getExportsOfModule(resolved)
+      .map((m) => `${m.name}: ${kindOf(m)}`)
+      .sort();
+    return `namespace { ${members.join('; ')} }`;
+  }
+  if (kind === 'class' || kind === 'interface' || kind === 'type') {
+    const declared = checker.getDeclaredTypeOfSymbol(resolved);
+    const fmt = (p, prefix = '') =>
+      `${prefix}${p.name}${p.flags & ts.SymbolFlags.Optional ? '?' : ''}: ${checker.typeToString(checker.getTypeOfSymbolAtLocation(p, decl), decl, flags)}`;
+    const isPrivate = (p) => {
+      const d = p.valueDeclaration;
+      return !!d && ((ts.getCombinedModifierFlags(d) & ts.ModifierFlags.Private) !== 0 || (d.name && ts.isPrivateIdentifier(d.name)));
+    };
+    const members = checker.getPropertiesOfType(declared).filter((p) => !isPrivate(p)).map((p) => fmt(p));
+    const statics = kind === 'class' ? type.getProperties().filter((p) => p.name !== 'prototype' && !isPrivate(p)).map((p) => fmt(p, 'static ')) : [];
+    members.push(...statics);
+    members.sort();
     const ctor = kind === 'class' ? type.getConstructSignatures().map((s) => `new ${checker.signatureToString(s, decl, flags)}`) : [];
     if (kind === 'type' && !members.length) return checker.typeToString(declared, decl, flags);
     return [...ctor, `{ ${members.join('; ')} }`].join(' ');
