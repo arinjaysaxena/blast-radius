@@ -20,8 +20,8 @@
 - [x] Classes, interfaces, enums, type aliases, re-exports, default exports
 
 ### 2026-11-25 - diff
-- [ ] Diff engine: added / removed / changed with breaking classification
-- [ ] Rename detection heuristic (same signature, similar name)
+- [x] Diff engine: added / removed / changed with breaking classification
+- [x] Rename detection heuristic (same signature, similar name)
 
 ### 2026-11-27 - call sites
 - [ ] Project scanner: resolve imports from the package, find usages via the checker
