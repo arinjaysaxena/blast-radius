@@ -28,7 +28,7 @@
 - [x] Map diff entries to call sites with file:line
 
 ### 2026-11-29 - CLI + report
-- [ ] CLI wiring, `pkg@version` fetching via npm pack (injectable)
+- [x] CLI wiring, `pkg@version` fetching via npm pack (injectable)
 - [x] Markdown and JSON reporters
 
 ### 2026-12-01 - GitHub Action

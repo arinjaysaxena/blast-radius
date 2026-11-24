@@ -1,2 +1,4 @@
 #!/usr/bin/env node
-console.log('blast-radius: under construction. See PLAN.md.');
+import { main } from '../src/cli.js';
+
+process.exitCode = main(process.argv.slice(2));
