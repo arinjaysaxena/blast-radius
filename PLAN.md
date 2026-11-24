@@ -29,7 +29,7 @@
 
 ### 2026-11-29 - CLI + report
 - [ ] CLI wiring, `pkg@version` fetching via npm pack (injectable)
-- [ ] Markdown and JSON reporters
+- [x] Markdown and JSON reporters
 
 ### 2026-12-01 - GitHub Action
 - [ ] action.yml + comment script (updates existing comment)
