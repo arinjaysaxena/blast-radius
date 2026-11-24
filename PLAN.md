@@ -32,8 +32,8 @@
 - [x] Markdown and JSON reporters
 
 ### 2026-12-01 - GitHub Action
-- [ ] action.yml + comment script (updates existing comment)
-- [ ] Action dry-run tests
+- [x] action.yml + comment script (updates existing comment)
+- [x] Action dry-run tests
 
 ### 2026-12-03 - quality
 - [ ] Fixture-based end to end tests, large-package performance guard
