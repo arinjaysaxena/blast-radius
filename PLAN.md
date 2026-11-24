@@ -36,7 +36,7 @@
 - [x] Action dry-run tests
 
 ### 2026-12-03 - quality
-- [ ] Fixture-based end to end tests, large-package performance guard
+- [x] Fixture-based end to end tests, large-package performance guard
 
 ### 2026-12-05 - ship
 - [ ] README (pitch, demo GIF steps, install, usage, how it works, roadmap)

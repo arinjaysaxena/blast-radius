@@ -38,7 +38,7 @@ export function run(opts, { resolver = createResolver() } = {}) {
   const newPkg = extractPackage(b.dir);
   const entries = diffApi(oldPkg.api, newPkg.api);
   const name = newPkg.name ?? oldPkg.name;
-  const sites = opts.project && name ? scanProject(opts.project, name) : [];
+  const sites = opts.project && name ? scanProject(opts.project, name, { onSkip: (f) => console.error(`warning: skipped ${f} (file too large)`) }) : [];
   const report = buildReport(entries, sites, {
     pkg: name,
     oldLabel: oldPkg.version ?? a.label,

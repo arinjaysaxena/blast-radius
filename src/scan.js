@@ -1,6 +1,6 @@
 // Project scanner: finds imports of a package and every use of the imported symbols.
 import ts from 'typescript';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'out', 'coverage', '.next']);
@@ -120,12 +120,19 @@ export function scanSource(file, source, pkg) {
 }
 
 /** Scan a project directory; sites carry repo-relative posix paths. */
-export function scanProject(root, pkg, { maxFiles } = {}) {
+export const MAX_FILE_BYTES = 1_000_000;
+
+/** Files over `maxBytes` (bundles, generated code) are skipped and reported via `onSkip(relPath)`. */
+export function scanProject(root, pkg, { maxFiles, maxBytes = MAX_FILE_BYTES, onSkip } = {}) {
   const sites = [];
   for (const full of listSourceFiles(root, { maxFiles })) {
     const rel = relative(root, full).split(sep).join('/');
     let source;
     try {
+      if (statSync(full).size > maxBytes) {
+        onSkip?.(rel);
+        continue;
+      }
       source = readFileSync(full, 'utf8');
     } catch {
       continue;
