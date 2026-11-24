@@ -39,7 +39,7 @@
 - [x] Fixture-based end to end tests, large-package performance guard
 
 ### 2026-12-05 - ship
-- [ ] README (pitch, demo GIF steps, install, usage, how it works, roadmap)
-- [ ] LICENSE (MIT), polish, CI green
+- [x] README (pitch, demo GIF steps, install, usage, how it works, roadmap)
+- [x] LICENSE (MIT), polish, CI green
 
-Status: in progress
+Status: v0.1 shipped
