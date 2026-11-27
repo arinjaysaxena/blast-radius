@@ -82,6 +82,10 @@ export interface ApiChange {
   new?: string;
   renamedTo?: string;
   reasons: string[];
+  /** Ids from the compatibility rules table that fired (checker-based engine only). */
+  rules?: string[];
+  /** Deprecation message when the change is, or comes with, a new `@deprecated` tag. */
+  deprecated?: string;
 }
 
 export interface DiffSummary {

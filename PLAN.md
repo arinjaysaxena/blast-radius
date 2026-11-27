@@ -21,7 +21,7 @@ Rules for v1:
 
 ## Milestone 3: checker-based diff (2026-11-29)
 - [x] Load old and new versions into one program under synthetic roots; wrap `isTypeAssignableTo` with a fallback and a guard test
-- [ ] Compatibility rules table from DESIGN.md (parameters, returns, members, enums, overloads, constraints), variance-aware
+- [x] Compatibility rules table from DESIGN.md (parameters, returns, members, enums, overloads, constraints), variance-aware
 - [ ] Rename detection with confidence scoring; deprecation reporting
 
 ## Milestone 4: registry + cache (2026-11-30)

@@ -17,7 +17,7 @@ export const OPTIONS: ts.CompilerOptions = {
   strict: true,
 };
 
-function kindOf(symbol: ts.Symbol): ApiKind {
+export function kindOf(symbol: ts.Symbol): ApiKind {
   const f = symbol.flags;
   if (f & ts.SymbolFlags.Class) return 'class';
   if (f & ts.SymbolFlags.Function) return 'function';
