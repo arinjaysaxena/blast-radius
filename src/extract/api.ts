@@ -7,7 +7,7 @@ import { describeSymbol } from './details.js';
 
 const ENTRY = '/__entry__.ts';
 
-const OPTIONS: ts.CompilerOptions = {
+export const OPTIONS: ts.CompilerOptions = {
   target: ts.ScriptTarget.ES2022,
   module: ts.ModuleKind.ESNext,
   moduleResolution: ts.ModuleResolutionKind.Bundler,
@@ -114,7 +114,7 @@ function libFile(name: string, lang: ts.ScriptTarget | ts.CreateSourceFileOption
   }
 }
 
-function memoryProgram(all: Record<string, string>, options: ts.CompilerOptions): ts.CompilerHost {
+export function memoryProgram(all: Record<string, string>, options: ts.CompilerOptions): ts.CompilerHost {
   const host = ts.createCompilerHost(options);
   host.getSourceFile = (name, lang) => {
     const text = all[name];

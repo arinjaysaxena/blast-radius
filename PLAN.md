@@ -20,7 +20,7 @@ Rules for v1:
 - [x] Fixture packages for each pattern under `test/fixtures/packages/`
 
 ## Milestone 3: checker-based diff (2026-11-29)
-- [ ] Load old and new versions into one program under synthetic roots; wrap `isTypeAssignableTo` with a fallback and a guard test
+- [x] Load old and new versions into one program under synthetic roots; wrap `isTypeAssignableTo` with a fallback and a guard test
 - [ ] Compatibility rules table from DESIGN.md (parameters, returns, members, enums, overloads, constraints), variance-aware
 - [ ] Rename detection with confidence scoring; deprecation reporting
 

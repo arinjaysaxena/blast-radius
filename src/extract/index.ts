@@ -1,3 +1,3 @@
 export { extractApi, extractApiFromFiles } from './api.js';
-export { entryCandidates, extractPackage, resolveEntries } from './package.js';
-export type { ModuleApi, PackageApi, PackageJson, ResolvedEntry } from './package.js';
+export { entryCandidates, extractPackage, loadPackage, resolveEntries } from './package.js';
+export type { LoadedPackage, ModuleApi, PackageApi, PackageJson, ResolvedEntry } from './package.js';

@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import type { ApiMap } from '../model/types.js';
 import { extractApiFromFiles } from './api.js';
-import { resolveEntries, type PackageJson } from './entries.js';
+import { resolveEntries, type PackageJson, type ResolvedEntry } from './entries.js';
 
 export { entryCandidates, resolveEntries } from './entries.js';
 export type { PackageJson, ResolvedEntry } from './entries.js';
@@ -41,8 +41,17 @@ function collect(dir: string, root: string, files: Record<string, string>): void
   }
 }
 
-/** Extract the public API of every module of the package in `dir`. */
-export function extractPackage(dir: string): PackageApi {
+/** A package directory read into memory: its manifest, declaration/source files and resolved entries. */
+export interface LoadedPackage {
+  name: string | null;
+  version: string | null;
+  /** Files keyed by absolute-style path (`/dist/index.d.ts`), relative to the package root. */
+  files: Record<string, string>;
+  entries: ResolvedEntry[];
+}
+
+/** Read the package in `dir` and resolve its entry points without extracting anything. */
+export function loadPackage(dir: string): LoadedPackage {
   const root = resolve(dir);
   const pkgPath = join(root, 'package.json');
   if (!existsSync(pkgPath)) throw new Error(`No package.json found in ${root}`);
@@ -56,12 +65,17 @@ export function extractPackage(dir: string): PackageApi {
   collect(root, root, files);
   const relFiles = new Set(Object.keys(files).map((f) => f.slice(1)));
   const entries = resolveEntries(pkg, relFiles);
-  const first = entries[0];
-  if (!first) {
+  if (!entries.length) {
     throw new Error(`Could not find type declarations for ${pkg.name ?? root}. Set "types" in package.json or ship an index.d.ts.`);
   }
-  const modules = entries.map((e) => ({ subpath: e.subpath, entry: e.file, api: extractApiFromFiles(files, '/' + e.file, pkg.name ?? null) }));
+  return { name: pkg.name ?? null, version: pkg.version ?? null, files, entries };
+}
+
+/** Extract the public API of every module of the package in `dir`. */
+export function extractPackage(dir: string): PackageApi {
+  const { name, version, files, entries } = loadPackage(dir);
+  const modules = entries.map((e) => ({ subpath: e.subpath, entry: e.file, api: extractApiFromFiles(files, '/' + e.file, name) }));
   const rootModule = modules.find((m) => m.subpath === '.') ?? modules[0];
   if (!rootModule) throw new Error('unreachable: entries is non-empty');
-  return { name: pkg.name ?? null, version: pkg.version ?? null, entry: rootModule.entry, api: rootModule.api, modules };
+  return { name, version, entry: rootModule.entry, api: rootModule.api, modules };
 }
