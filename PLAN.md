@@ -10,7 +10,7 @@ Rules for v1:
 - After v1 ships, keep going down the Roadmap section. There is always a next task.
 
 ## Milestone 1: TypeScript foundation (2026-11-27)
-- [ ] Add TypeScript strict config, tsup build, vitest, typescript-eslint; CI matrix Node 20/22 on Ubuntu and Windows
+- [x] Add TypeScript strict config, tsup build, vitest, typescript-eslint; CI matrix Node 20/22 on Ubuntu and Windows
 - [ ] Port `model/` types and `report/` (markdown, json) to TS with tests
 - [ ] Port `extract/` to TS, keeping all existing behaviour covered by tests
 

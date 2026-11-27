@@ -3,14 +3,47 @@
   "version": "0.1.0",
   "description": "",
   "type": "module",
-  "bin": { "blast-radius": "bin/blast-radius.js" },
-  "engines": { "node": ">=20" },
+  "bin": {
+    "blast-radius": "bin/blast-radius.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "test": "node --test test/*.test.js",
+    "test": "vitest run",
     "lint": "eslint .",
-    "build": "node scripts/check.js"
+    "typecheck": "tsc --noEmit",
+    "build": "tsup"
   },
   "license": "MIT",
-  "dependencies": { "typescript": "^5.4.0" },
-  "devDependencies": { "eslint": "^9.0.0", "@eslint/js": "^9.0.0", "globals": "^15.0.0" }
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/node": "^26.6.11",
+    "eslint": "^9.0.0",
+    "globals": "^15.0.0",
+    "tsup": "^9.0.0",
+    "typescript": "5.6",
+    "typescript-eslint": "^8.74.0",
+    "vitest": "^5.1.2"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "action.yml"
+  ],
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  }
 }

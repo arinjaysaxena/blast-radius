@@ -1,4 +1,4 @@
-import test from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { extractApi } from '../src/extract.js';
 import { diffApi, summarize, splitOverloads, parseCallSignature, nameSimilarity } from '../src/diff.js';

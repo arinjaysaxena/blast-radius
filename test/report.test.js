@@ -1,4 +1,4 @@
-import test from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { buildReport, renderMarkdown, renderJson } from '../src/report.js';
 import { extractApi } from '../src/extract.js';
