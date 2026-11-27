@@ -1,11 +1,12 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
+import { sym } from './helpers.js';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { entryCandidates, extractPackage } from '../src/package.js';
+import { entryCandidates, extractPackage } from '../src/extract/index.js';
 
-const mkPkg = (files) => {
+const mkPkg = (files: Record<string, string | object>): string => {
   const dir = mkdtempSync(join(tmpdir(), 'br-'));
   for (const [p, c] of Object.entries(files)) {
     mkdirSync(dirname(join(dir, p)), { recursive: true });
@@ -35,7 +36,7 @@ test('extracts a package through its types field, following relative imports', (
   assert.equal(r.version, '1.2.3');
   assert.equal(r.entry, 'dist/index.d.ts');
   assert.deepEqual(Object.keys(r.api), ['LIMIT', 'main', 'Opts']);
-  assert.match(r.api.main.signature, /\(a: number\): string/);
+  assert.match(sym(r.api, 'main').signature, /\(a: number\): string/);
 });
 
 test('falls back to index.d.ts and reports a clear error when nothing is found', () => {

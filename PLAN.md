@@ -11,8 +11,8 @@ Rules for v1:
 
 ## Milestone 1: TypeScript foundation (2026-11-27)
 - [x] Add TypeScript strict config, tsup build, vitest, typescript-eslint; CI matrix Node 20/22 on Ubuntu and Windows
-- [ ] Port `model/` types and `report/` (markdown, json) to TS with tests
-- [ ] Port `extract/` to TS, keeping all existing behaviour covered by tests
+- [x] Port `model/` types and `report/` (markdown, json) to TS with tests
+- [x] Port `extract/` to TS, keeping all existing behaviour covered by tests
 
 ## Milestone 2: real extraction (2026-11-28)
 - [ ] Entry resolution: `exports` conditions and subpaths, `typesVersions`, `types`, `main` + sibling `.d.ts`; one module per subpath export

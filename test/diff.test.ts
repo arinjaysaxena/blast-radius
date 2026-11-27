@@ -1,10 +1,12 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { extractApi } from '../src/extract.js';
-import { diffApi, summarize, splitOverloads, parseCallSignature, nameSimilarity } from '../src/diff.js';
+import type { ApiChange } from '../src/model/types.js';
+import { entryFor, mustEntry } from './helpers.js';
+import { extractApi } from '../src/extract/index.js';
+import { diffApi, summarize, splitOverloads, parseCallSignature, nameSimilarity } from '../src/diff/index.js';
 
-const diff = (a, b) => diffApi(extractApi(a), extractApi(b));
-const one = (entries, name) => entries.find((e) => e.name === name);
+const diff = (a: string, b: string): ApiChange[] => diffApi(extractApi(a), extractApi(b));
+const one = mustEntry;
 
 test('added, removed and unchanged symbols', () => {
   const d = diff('export const a = 1; export function gone(): void {}', 'export const a = 1; export function fresh(x: number, y: string[]): Promise<void> { return null as any }');
@@ -12,7 +14,7 @@ test('added, removed and unchanged symbols', () => {
   assert.equal(one(d, 'fresh').breaking, false);
   assert.equal(one(d, 'gone').change, 'removed');
   assert.equal(one(d, 'gone').breaking, true);
-  assert.equal(one(d, 'a'), undefined);
+  assert.equal(entryFor(d, 'a'), undefined);
 });
 
 test('function changes: optional param added is safe, required param or type change breaks', () => {
@@ -20,10 +22,10 @@ test('function changes: optional param added is safe, required param or type cha
   assert.equal(one(diff(base, 'export function f(a: string, b?: number): number { return 1 }'), 'f').breaking, false);
   const req = one(diff(base, 'export function f(a: string, b: number): number { return 1 }'), 'f');
   assert.equal(req.breaking, true);
-  assert.match(req.reasons[0], /required parameter "b" added/);
-  assert.match(one(diff(base, 'export function f(a: number): number { return 1 }'), 'f').reasons[0], /parameter "a" type changed/);
-  assert.match(one(diff(base, 'export function f(a: string): string { return "" }'), 'f').reasons[0], /return type changed/);
-  assert.match(one(diff(base, 'export function f(): number { return 1 }'), 'f').reasons[0], /"a" removed/);
+  assert.match(req.reasons[0] ?? '', /required parameter "b" added/);
+  assert.match(one(diff(base, 'export function f(a: number): number { return 1 }'), 'f').reasons[0] ?? '', /parameter "a" type changed/);
+  assert.match(one(diff(base, 'export function f(a: string): string { return "" }'), 'f').reasons[0] ?? '', /return type changed/);
+  assert.match(one(diff(base, 'export function f(): number { return 1 }'), 'f').reasons[0] ?? '', /"a" removed/);
 });
 
 test('added overload is non-breaking', () => {
@@ -41,9 +43,9 @@ test('interface and class member changes', () => {
   );
   const o = one(d, 'O');
   assert.ok(o.breaking);
-  assert.ok(o.reasons.some((r) => /"a" type changed/.test(r)));
-  assert.ok(o.reasons.some((r) => /"b" removed/.test(r)));
-  assert.ok(o.reasons.some((r) => /required member "c" added/.test(r)));
+  assert.ok(o.reasons.some((r: string) => /"a" type changed/.test(r)));
+  assert.ok(o.reasons.some((r: string) => /"b" removed/.test(r)));
+  assert.ok(o.reasons.some((r: string) => /required member "c" added/.test(r)));
   const c = one(d, 'C');
   assert.deepEqual(c.reasons, ['member "y" removed']); // adding z to a class is fine
   assert.equal(one(diff('export interface O { a: number }', 'export interface O { a: number; b?: string }'), 'O').breaking, false);
@@ -51,12 +53,12 @@ test('interface and class member changes', () => {
 
 test('enum member removal and value change break; additions do not', () => {
   assert.equal(one(diff('export enum E { A, B }', 'export enum E { A, B, C }'), 'E').breaking, false);
-  assert.match(one(diff('export enum E { A, B }', 'export enum E { A }'), 'E').reasons[0], /"B" removed/);
-  assert.match(one(diff('export enum E { A = 1 }', 'export enum E { A = 2 }'), 'E').reasons[0], /value changed/);
+  assert.match(one(diff('export enum E { A, B }', 'export enum E { A }'), 'E').reasons[0] ?? '', /"B" removed/);
+  assert.match(one(diff('export enum E { A = 1 }', 'export enum E { A = 2 }'), 'E').reasons[0] ?? '', /value changed/);
 });
 
 test('kind change is breaking; type alias change is breaking', () => {
-  assert.match(one(diff('export const x: number = 1', 'export function x(): number { return 1 }'), 'x').reasons[0], /kind changed/);
+  assert.match(one(diff('export const x: number = 1', 'export function x(): number { return 1 }'), 'x').reasons[0] ?? '', /kind changed/);
   assert.equal(one(diff('export type T = string', 'export type T = string | number'), 'T').breaking, true);
 });
 
@@ -66,7 +68,7 @@ test('rename detection pairs identical signatures with similar names, one-to-one
     'export function fetchUserById(id: string): Promise<string> { return null as any } export function other(): void {}',
   );
   assert.equal(d.length, 1);
-  assert.deepEqual([d[0].name, d[0].change, d[0].renamedTo], ['getUserById', 'renamed', 'fetchUserById']);
+  assert.deepEqual([d[0]?.name, d[0]?.change, d[0]?.renamedTo], ['getUserById', 'renamed', 'fetchUserById']);
   // unrelated removal + addition must not be paired
   const e = diff('export function alpha(a: string): void {}', 'export function zzzzzz(a: string): void {}');
   assert.deepEqual(e.map((x) => x.change).sort(), ['added', 'removed']);
@@ -80,6 +82,7 @@ test('summarize counts', () => {
 test('helpers', () => {
   assert.deepEqual(splitOverloads('(a: string): string | number | (b: 1): 2'), ['(a: string): string | number', '(b: 1): 2']);
   const p = parseCallSignature('<T>(a: T, ...rest: number[], c?: Map<string, T>): void');
+  assert.ok(p);
   assert.deepEqual(p.params.map((x) => [x.name, x.optional, x.rest]), [['a', false, false], ['rest', true, true], ['c', true, false]]);
   assert.ok(nameSimilarity('getUser', 'GetUser') === 1);
 });

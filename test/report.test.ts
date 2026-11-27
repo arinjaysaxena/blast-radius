@@ -1,9 +1,10 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { buildReport, renderMarkdown, renderJson } from '../src/report.js';
-import { extractApi } from '../src/extract.js';
-import { diffApi } from '../src/diff.js';
-import { scanSource } from '../src/scan.js';
+import type { Report } from '../src/model/types.js';
+import { buildReport, renderMarkdown, renderJson } from '../src/report/index.js';
+import { extractApi } from '../src/extract/index.js';
+import { diffApi } from '../src/diff/index.js';
+import { scanSource } from '../src/usage/index.js';
 
 const oldApi = extractApi('export function parse(s: string): number;\nexport function gone(): void;\nexport const keep: number;');
 const newApi = extractApi('export function parse(s: string, strict: boolean): number;\nexport const keep: number;\nexport function fresh(): void;');
@@ -20,7 +21,7 @@ test('buildReport counts impacted symbols and call sites', () => {
   assert.ok(r.summary.callSites >= 5);
   assert.deepEqual(r.impacted.map((i) => i.name), ['gone', 'parse']);
   assert.deepEqual(r.untouched, []);
-  assert.deepEqual(JSON.parse(renderJson(r)).summary, r.summary);
+  assert.deepEqual((JSON.parse(renderJson(r)) as Report).summary, r.summary);
 });
 
 test('renderMarkdown lists call sites and all changes', () => {
@@ -35,6 +36,6 @@ test('renderMarkdown handles no changes, no scan and site truncation', () => {
   assert.match(renderMarkdown(buildReport([], [], {})), /No public API changes detected/);
   const noScan = renderMarkdown(buildReport(entries, [], { scanned: false }));
   assert.doesNotMatch(noScan, /your code/);
-  const many = Array.from({ length: 13 }, (_, i) => ({ symbol: 'parse', file: 'f.ts', line: i + 1, column: 1, kind: 'use' }));
+  const many = Array.from({ length: 13 }, (_, i) => ({ symbol: 'parse', file: 'f.ts', line: i + 1, column: 1, kind: 'use' as const, text: '' }));
   assert.match(renderMarkdown(buildReport(entries, many, { scanned: true })), /and 3 more/);
 });

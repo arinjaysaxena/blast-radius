@@ -1,9 +1,9 @@
 // CLI: blast-radius <old> <new> [--project .] [--format md|json] [--out file] [--fail-on-breaking]
 import { writeFileSync } from 'node:fs';
-import { extractPackage } from './package.js';
-import { diffApi } from './diff.js';
-import { scanProject } from './scan.js';
-import { buildReport, renderJson, renderMarkdown } from './report.js';
+import { extractPackage } from './extract/index.js';
+import { diffApi } from './diff/index.js';
+import { scanProject } from './usage/index.js';
+import { buildReport, renderJson, renderMarkdown } from './report/index.js';
 import { createResolver } from './fetch.js';
 
 export const USAGE = 'usage: blast-radius <old> <new> [--project dir] [--format md|json] [--out file] [--fail-on-breaking]\n  <old>/<new> are package directories or npm specs such as lodash@4.17.20';

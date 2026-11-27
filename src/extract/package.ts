@@ -1,17 +1,36 @@
 // Resolve a package directory's type entry point and extract its public API.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
-import { extractApiFromFiles } from './extract.js';
+import type { ApiMap } from '../model/types.js';
+import { extractApiFromFiles } from './api.js';
 
 const SKIP = new Set(['node_modules', '.git']);
 const SOURCE = /\.(?:d\.)?[mc]?tsx?$/;
 const MAX_FILES = 3000;
 
+export interface PackageJson {
+  name?: string;
+  version?: string;
+  main?: string;
+  types?: string;
+  typings?: string;
+  exports?: unknown;
+}
+
+export interface PackageApi {
+  name: string | null;
+  version: string | null;
+  entry: string;
+  api: ApiMap;
+}
+
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
 /** Pick the string entry from an `exports` condition value, preferring types. */
-function fromConditions(v) {
+function fromConditions(v: unknown): string | null {
   if (typeof v === 'string') return v;
   if (Array.isArray(v)) return v.map(fromConditions).find(Boolean) ?? null;
-  if (v && typeof v === 'object') {
+  if (isRecord(v)) {
     for (const key of ['types', 'import', 'module', 'default', 'require', 'node']) {
       const r = fromConditions(v[key]);
       if (r) return r;
@@ -20,16 +39,18 @@ function fromConditions(v) {
   return null;
 }
 
-const toDts = (p) => p.replace(/\.(m|c)?jsx?$/, (_, k) => `.d.${k ?? ''}ts`);
+const toDts = (p: string): string => p.replace(/\.(m|c)?jsx?$/, (_: string, k?: string) => `.d.${k ?? ''}ts`);
 
 /** Candidate type entry paths (relative, posix) in priority order. */
-export function entryCandidates(pkg) {
-  const out = [];
-  const add = (p) => p && out.push(p.replace(/^\.\//, ''));
+export function entryCandidates(pkg: PackageJson): string[] {
+  const out: string[] = [];
+  const add = (p: string | null | undefined): void => {
+    if (p) out.push(p.replace(/^\.\//, ''));
+  };
   const exp = pkg.exports;
   if (exp) {
-    const root = typeof exp === 'string' || Array.isArray(exp) || !Object.keys(exp).some((k) => k.startsWith('.')) ? exp : exp['.'];
-    if (root && typeof root === 'object' && !Array.isArray(root) && root.types) add(fromConditions(root.types));
+    const root: unknown = !isRecord(exp) || !Object.keys(exp).some((k) => k.startsWith('.')) ? exp : exp['.'];
+    if (isRecord(root) && root['types']) add(fromConditions(root['types']));
     add(fromConditions(root));
   }
   add(pkg.types);
@@ -43,7 +64,7 @@ export function entryCandidates(pkg) {
   return [...new Set(out.flatMap((p) => (/\.[mc]?jsx?$/.test(p) ? [toDts(p), p.replace(/\.[mc]?jsx?$/, '.ts')] : [p])))];
 }
 
-function collect(dir, root, files) {
+function collect(dir: string, root: string, files: Record<string, string>): void {
   for (const name of readdirSync(dir)) {
     if (SKIP.has(name) || Object.keys(files).length >= MAX_FILES) continue;
     const full = join(dir, name);
@@ -54,12 +75,17 @@ function collect(dir, root, files) {
 }
 
 /** Extract the public API of the package in `dir`. Returns { name, version, entry, api }. */
-export function extractPackage(dir) {
+export function extractPackage(dir: string): PackageApi {
   const root = resolve(dir);
   const pkgPath = join(root, 'package.json');
   if (!existsSync(pkgPath)) throw new Error(`No package.json found in ${root}`);
-  const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
-  const files = {};
+  let pkg: PackageJson;
+  try {
+    pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as PackageJson;
+  } catch (e) {
+    throw new Error(`Invalid package.json in ${root}: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  const files: Record<string, string> = {};
   collect(root, root, files);
   const entry = entryCandidates(pkg).map((c) => '/' + c).find((c) => c in files);
   if (!entry) {

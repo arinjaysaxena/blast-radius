@@ -2,17 +2,28 @@
 import ts from 'typescript';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+import type { CallSite, SiteKind } from '../model/types.js';
 
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'out', 'coverage', '.next']);
 const EXT = /\.(?:[mc]?[jt]sx?)$/;
 const DECL = /\.d\.[mc]?ts$/;
 
 /** Does module specifier `spec` refer to package `pkg` (or one of its subpaths)? */
-export const matchesPackage = (spec, pkg) => spec === pkg || spec.startsWith(`${pkg}/`);
+export const matchesPackage = (spec: string, pkg: string): boolean => spec === pkg || spec.startsWith(`${pkg}/`);
 
-export function listSourceFiles(root, { maxFiles = 20000 } = {}) {
-  const out = [];
-  const visit = (dir) => {
+export const MAX_FILE_BYTES = 1_000_000;
+
+export interface ScanOptions {
+  maxFiles?: number;
+  /** Files larger than this (bundles, generated code) are skipped. */
+  maxBytes?: number;
+  /** Called with the project-relative path of every skipped file. */
+  onSkip?: (relPath: string) => void;
+}
+
+export function listSourceFiles(root: string, { maxFiles = 20000 }: Pick<ScanOptions, 'maxFiles'> = {}): string[] {
+  const out: string[] = [];
+  const visit = (dir: string): void => {
     for (const e of readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
       if (out.length >= maxFiles) return;
       const full = join(dir, e.name);
@@ -25,7 +36,7 @@ export function listSourceFiles(root, { maxFiles = 20000 } = {}) {
   return out;
 }
 
-function scriptKind(file) {
+function scriptKind(file: string): ts.ScriptKind {
   if (/\.tsx$/.test(file)) return ts.ScriptKind.TSX;
   if (/\.jsx$/.test(file)) return ts.ScriptKind.JSX;
   if (/\.[mc]?ts$/.test(file)) return ts.ScriptKind.TS;
@@ -33,25 +44,27 @@ function scriptKind(file) {
 }
 
 /**
- * Scan one source text. Returns sites: [{ file, line, column, symbol, kind: 'import'|'use', text }]
- * where `symbol` is the exported name from `pkg` ("default" for default imports, "*" for bare namespace use).
- * Syntactic only: shadowed local names are not distinguished (documented limitation).
+ * Scan one source text. `symbol` is the exported name from `pkg` ("default" for default imports,
+ * "*" for bare namespace use). Syntactic only: shadowed local names are not distinguished.
  */
-export function scanSource(file, source, pkg) {
+export function scanSource(file: string, source: string, pkg: string): CallSite[] {
   const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, scriptKind(file));
-  const bindings = new Map(); // local identifier name -> exported symbol name
-  const namespaces = new Set(); // local names bound to the whole module
-  const importNodes = new Set();
-  const sites = [];
+  const bindings = new Map<string, string>(); // local identifier name -> exported symbol name
+  const namespaces = new Set<string>(); // local names bound to the whole module
+  const importNodes = new Set<ts.Node>();
+  const sites: CallSite[] = [];
   const lines = source.split('\n');
-  const push = (node, symbol, kind) => {
+  const push = (node: ts.Node, symbol: string, kind: SiteKind): void => {
     const { line, character } = sf.getLineAndCharacterOfPosition(node.getStart(sf));
     sites.push({ file, line: line + 1, column: character + 1, symbol, kind, text: (lines[line] ?? '').trim() });
   };
 
-  const bindRequire = (decl) => {
+  const bindRequire = (decl: ts.VariableDeclaration): void => {
     const init = decl.initializer;
-    const call = init && ts.isCallExpression(init) ? init : init && ts.isPropertyAccessExpression(init) && ts.isCallExpression(init.expression) ? init.expression : null;
+    if (!init) return;
+    let call: ts.CallExpression | null = null;
+    if (ts.isCallExpression(init)) call = init;
+    else if (ts.isPropertyAccessExpression(init) && ts.isCallExpression(init.expression)) call = init.expression;
     if (!call || !ts.isIdentifier(call.expression) || call.expression.text !== 'require') return;
     const arg = call.arguments[0];
     if (!arg || !ts.isStringLiteralLike(arg) || !matchesPackage(arg.text, pkg)) return;
@@ -75,7 +88,7 @@ export function scanSource(file, source, pkg) {
   };
 
   // Pass 1: imports
-  const collect = (node) => {
+  const collect = (node: ts.Node): void => {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) && matchesPackage(node.moduleSpecifier.text, pkg)) {
       const c = node.importClause;
       if (c?.name) {
@@ -86,7 +99,7 @@ export function scanSource(file, source, pkg) {
       if (c?.namedBindings && ts.isNamespaceImport(c.namedBindings)) {
         namespaces.add(c.namedBindings.name.text);
         importNodes.add(c.namedBindings.name);
-      } else if (c?.namedBindings) {
+      } else if (c?.namedBindings && ts.isNamedImports(c.namedBindings)) {
         for (const el of c.namedBindings.elements) {
           const imported = (el.propertyName ?? el.name).text;
           bindings.set(el.name.text, imported);
@@ -96,7 +109,8 @@ export function scanSource(file, source, pkg) {
       }
     } else if (ts.isVariableDeclaration(node)) bindRequire(node);
     else if (ts.isExportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier) && matchesPackage(node.moduleSpecifier.text, pkg)) {
-      for (const el of node.exportClause && ts.isNamedExports(node.exportClause) ? node.exportClause.elements : []) push(el, (el.propertyName ?? el.name).text, 'import');
+      const clause = node.exportClause;
+      for (const el of clause && ts.isNamedExports(clause) ? clause.elements : []) push(el, (el.propertyName ?? el.name).text, 'import');
     }
     ts.forEachChild(node, collect);
   };
@@ -104,12 +118,13 @@ export function scanSource(file, source, pkg) {
   if (!bindings.size && !namespaces.size) return sites;
 
   // Pass 2: uses
-  const walk = (node) => {
+  const walk = (node: ts.Node): void => {
     if (ts.isIdentifier(node) && !importNodes.has(node)) {
       const parent = node.parent;
       const isImportSyntax = ts.isImportSpecifier(parent) || ts.isImportClause(parent) || ts.isNamespaceImport(parent);
       const isMemberName = (ts.isPropertyAccessExpression(parent) && parent.name === node) || (ts.isPropertyAssignment(parent) && parent.name === node);
-      if (!isImportSyntax && !isMemberName && bindings.has(node.text)) push(node, bindings.get(node.text), 'use');
+      const boundTo = bindings.get(node.text);
+      if (!isImportSyntax && !isMemberName && boundTo !== undefined) push(node, boundTo, 'use');
       else if (ts.isPropertyAccessExpression(parent) && parent.expression === node && namespaces.has(node.text)) push(parent.name, parent.name.text, 'use');
       else if (namespaces.has(node.text) && !isImportSyntax && !isMemberName && !(ts.isPropertyAccessExpression(parent) && parent.expression === node)) push(node, '*', 'use');
     }
@@ -120,14 +135,12 @@ export function scanSource(file, source, pkg) {
 }
 
 /** Scan a project directory; sites carry repo-relative posix paths. */
-export const MAX_FILE_BYTES = 1_000_000;
-
-/** Files over `maxBytes` (bundles, generated code) are skipped and reported via `onSkip(relPath)`. */
-export function scanProject(root, pkg, { maxFiles, maxBytes = MAX_FILE_BYTES, onSkip } = {}) {
-  const sites = [];
-  for (const full of listSourceFiles(root, { maxFiles })) {
+export function scanProject(root: string, pkg: string, options: ScanOptions = {}): CallSite[] {
+  const { maxBytes = MAX_FILE_BYTES, onSkip } = options;
+  const sites: CallSite[] = [];
+  for (const full of listSourceFiles(root, options.maxFiles === undefined ? {} : { maxFiles: options.maxFiles })) {
     const rel = relative(root, full).split(sep).join('/');
-    let source;
+    let source: string;
     try {
       if (statSync(full).size > maxBytes) {
         onSkip?.(rel);
@@ -141,20 +154,4 @@ export function scanProject(root, pkg, { maxFiles, maxBytes = MAX_FILE_BYTES, on
     sites.push(...scanSource(rel, source, pkg));
   }
   return sites;
-}
-
-/**
- * Map diff entries onto call sites. Only non-additive entries matter. Returns
- * [{ entry, sites }] for entries that have at least one site, plus `untouched` entries without sites.
- * Bare namespace uses ("*", e.g. passing the whole module around) are not attributed to any symbol.
- */
-export function mapChangesToSites(entries, sites) {
-  const impacted = [];
-  const untouched = [];
-  for (const entry of entries.filter((e) => e.change !== 'added')) {
-    const exact = sites.filter((s) => s.symbol === entry.name);
-    if (exact.length) impacted.push({ entry, sites: exact });
-    else untouched.push(entry);
-  }
-  return { impacted, untouched, totalSites: new Set(impacted.flatMap((i) => i.sites.map((s) => `${s.file}:${s.line}:${s.column}`))).size };
 }

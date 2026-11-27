@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { main } from '../src/cli.js';
-import { scanProject } from '../src/scan.js';
+import { scanProject } from '../src/usage/index.js';
 
 const tmp = (p) => mkdtempSync(join(tmpdir(), p));
 function pkg(version, dts) {

@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { scanSource, scanProject, mapChangesToSites, matchesPackage } from '../src/scan.js';
-import { extractApi } from '../src/extract.js';
-import { diffApi } from '../src/diff.js';
+import type { CallSite } from '../src/model/types.js';
+import { scanSource, scanProject, mapChangesToSites, matchesPackage } from '../src/usage/index.js';
+import { extractApi } from '../src/extract/index.js';
+import { diffApi } from '../src/diff/index.js';
 
-const syms = (sites) => sites.map((s) => `${s.symbol}@${s.line}:${s.kind}`);
+const syms = (sites: CallSite[]): string[] => sites.map((s) => `${s.symbol}@${s.line}:${s.kind}`);
 
 test('named, aliased and default imports are tracked with line numbers', () => {
   const src = [
@@ -57,7 +58,7 @@ test('scanProject walks the tree, skips node_modules and maps diff entries to si
   );
   const { impacted, untouched, totalSites } = mapChangesToSites(entries, sites);
   assert.deepEqual(impacted.map((i) => i.entry.name), ['oldFn']);
-  assert.deepEqual(impacted[0].sites.map((s) => `${s.file}:${s.line}`), ['src/a.ts:1', 'src/a.ts:2', 'src/b.tsx:1', 'src/b.tsx:2']);
+  assert.deepEqual(impacted[0]?.sites.map((s) => `${s.file}:${s.line}`), ['src/a.ts:1', 'src/a.ts:2', 'src/b.tsx:1', 'src/b.tsx:2']);
   assert.deepEqual(untouched.map((e) => e.name), ['unused']);
   assert.equal(totalSites, 4);
 });

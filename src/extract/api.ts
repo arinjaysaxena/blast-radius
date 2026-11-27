@@ -1,9 +1,10 @@
 // Extract the public API (exported symbols + signatures) from TypeScript sources.
 import ts from 'typescript';
+import type { ApiKind, ApiMap } from '../model/types.js';
 
 const ENTRY = '/__entry__.ts';
 
-const OPTIONS = {
+const OPTIONS: ts.CompilerOptions = {
   target: ts.ScriptTarget.ES2022,
   module: ts.ModuleKind.ESNext,
   moduleResolution: ts.ModuleResolutionKind.Bundler,
@@ -13,7 +14,7 @@ const OPTIONS = {
   strict: true,
 };
 
-function kindOf(symbol) {
+function kindOf(symbol: ts.Symbol): ApiKind {
   const f = symbol.flags;
   if (f & ts.SymbolFlags.Class) return 'class';
   if (f & ts.SymbolFlags.Function) return 'function';
@@ -25,10 +26,10 @@ function kindOf(symbol) {
   return 'unknown';
 }
 
-function signatureOf(checker, symbol, node) {
+function signatureOf(checker: ts.TypeChecker, symbol: ts.Symbol, node: ts.Node): string {
   const resolved = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
-  const decl = resolved.declarations?.[0] ?? node;
-  const flags = ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.UseAliasDefinedOutsideCurrentScope;
+  const decl: ts.Node = resolved.declarations?.[0] ?? node;
+  const flags: ts.TypeFormatFlags = ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.UseAliasDefinedOutsideCurrentScope;
   const type = checker.getTypeOfSymbolAtLocation(resolved, decl);
   const kind = kindOf(resolved);
   if (kind === 'function') {
@@ -53,11 +54,14 @@ function signatureOf(checker, symbol, node) {
   }
   if (kind === 'class' || kind === 'interface' || kind === 'type') {
     const declared = checker.getDeclaredTypeOfSymbol(resolved);
-    const fmt = (p, prefix = '') =>
+    const fmt = (p: ts.Symbol, prefix = ''): string =>
       `${prefix}${p.name}${p.flags & ts.SymbolFlags.Optional ? '?' : ''}: ${checker.typeToString(checker.getTypeOfSymbolAtLocation(p, decl), decl, flags)}`;
-    const isPrivate = (p) => {
+    const isPrivate = (p: ts.Symbol): boolean => {
       const d = p.valueDeclaration;
-      return !!d && ((ts.getCombinedModifierFlags(d) & ts.ModifierFlags.Private) !== 0 || (d.name && ts.isPrivateIdentifier(d.name)));
+      if (!d) return false;
+      if ((ts.getCombinedModifierFlags(d) & ts.ModifierFlags.Private) !== 0) return true;
+      const name = (d as ts.NamedDeclaration).name;
+      return name !== undefined && ts.isPrivateIdentifier(name);
     };
     const members = checker.getPropertiesOfType(declared).filter((p) => !isPrivate(p)).map((p) => fmt(p));
     const statics = kind === 'class' ? type.getProperties().filter((p) => p.name !== 'prototype' && !isPrivate(p)).map((p) => fmt(p, 'static ')) : [];
@@ -70,11 +74,11 @@ function signatureOf(checker, symbol, node) {
   return checker.typeToString(type, decl, flags);
 }
 
-function apiFromProgram(program, entry) {
+function apiFromProgram(program: ts.Program, entry: string): ApiMap {
   const checker = program.getTypeChecker();
   const sf = program.getSourceFile(entry);
   const moduleSymbol = sf && checker.getSymbolAtLocation(sf);
-  const api = {};
+  const api: ApiMap = {};
   if (!moduleSymbol) return api;
   for (const sym of checker.getExportsOfModule(moduleSymbol).sort((a, b) => a.name.localeCompare(b.name))) {
     const target = sym.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym) : sym;
@@ -83,9 +87,12 @@ function apiFromProgram(program, entry) {
   return api;
 }
 
-function memoryProgram(all, options) {
+function memoryProgram(all: Record<string, string>, options: ts.CompilerOptions): ts.CompilerHost {
   const host = ts.createCompilerHost(options);
-  host.getSourceFile = (name, lang) => (name in all ? ts.createSourceFile(name, all[name], lang, true) : undefined);
+  host.getSourceFile = (name, lang) => {
+    const text = all[name];
+    return text === undefined ? undefined : ts.createSourceFile(name, text, lang, true);
+  };
   host.fileExists = (name) => name in all;
   host.readFile = (name) => all[name];
   host.directoryExists = (dir) => Object.keys(all).some((f) => f.startsWith(dir.endsWith('/') ? dir : `${dir}/`));
@@ -97,14 +104,14 @@ function memoryProgram(all, options) {
  * Extract exports from TS source text. `files` may add extra modules ({ '/other.ts': '...' })
  * that the entry can import from. Returns { name: { kind, signature } } sorted by name.
  */
-export function extractApi(source, files = {}) {
+export function extractApi(source: string, files: Record<string, string> = {}): ApiMap {
   const all = { ...files, [ENTRY]: source };
   const host = memoryProgram(all, OPTIONS);
   return apiFromProgram(ts.createProgram({ rootNames: Object.keys(all), options: OPTIONS, host }), ENTRY);
 }
 
 /** Extract the API from in-memory files ({ '/index.d.ts': '...' }) starting at `entry`, resolving relative imports. */
-export function extractApiFromFiles(files, entry) {
+export function extractApiFromFiles(files: Record<string, string>, entry: string): ApiMap {
   const options = { ...OPTIONS, noResolve: false };
   const host = memoryProgram(files, options);
   return apiFromProgram(ts.createProgram({ rootNames: [entry], options, host }), entry);
