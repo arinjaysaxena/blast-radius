@@ -1,0 +1,8 @@
+{
+  "name": "exports-patterns",
+  "version": "1.0.0",
+  "exports": {
+    ".": "./lib/index.js",
+    "./features/*": "./lib/features/*.js"
+  }
+}

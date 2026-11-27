@@ -1,0 +1,14 @@
+{
+  "name": "exports-conditions",
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+      "require": { "types": "./dist/index.d.cts", "default": "./dist/index.cjs" }
+    },
+    "./utils": { "types": "./dist/utils.d.ts", "default": "./dist/utils.js" },
+    "./internal/*": null,
+    "./package.json": "./package.json"
+  }
+}

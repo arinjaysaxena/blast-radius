@@ -15,7 +15,7 @@ Rules for v1:
 - [x] Port `extract/` to TS, keeping all existing behaviour covered by tests
 
 ## Milestone 2: real extraction (2026-11-28)
-- [ ] Entry resolution: `exports` conditions and subpaths, `typesVersions`, `types`, `main` + sibling `.d.ts`; one module per subpath export
+- [x] Entry resolution: `exports` conditions and subpaths, `typesVersions`, `types`, `main` + sibling `.d.ts`; one module per subpath export
 - [ ] Resolve aliases and re-exports (`export *`, `export { a as b }`, `export =`); capture overloads, type params, members, enum values, JSDoc `@deprecated`
 - [ ] Fixture packages for each pattern under `test/fixtures/packages/`
 

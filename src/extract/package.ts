@@ -1,71 +1,38 @@
-// Resolve a package directory's type entry point and extract its public API.
+// Resolve a package directory's modules and extract the public API of each.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import type { ApiMap } from '../model/types.js';
 import { extractApiFromFiles } from './api.js';
+import { resolveEntries, type PackageJson } from './entries.js';
+
+export { entryCandidates, resolveEntries } from './entries.js';
+export type { PackageJson, ResolvedEntry } from './entries.js';
 
 const SKIP = new Set(['node_modules', '.git']);
 const SOURCE = /\.(?:d\.)?[mc]?tsx?$/;
 const MAX_FILES = 3000;
 
-export interface PackageJson {
-  name?: string;
-  version?: string;
-  main?: string;
-  types?: string;
-  typings?: string;
-  exports?: unknown;
+/** The public API of one module (the package root or a subpath export). */
+export interface ModuleApi {
+  /** `.` for the package root, `./sub` for a subpath export. */
+  subpath: string;
+  /** Declaration file behind the module, relative to the package root. */
+  entry: string;
+  api: ApiMap;
 }
 
 export interface PackageApi {
   name: string | null;
   version: string | null;
+  /** Entry file and API of the root module (or the first module when the package has no `.` export). */
   entry: string;
   api: ApiMap;
-}
-
-const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
-
-/** Pick the string entry from an `exports` condition value, preferring types. */
-function fromConditions(v: unknown): string | null {
-  if (typeof v === 'string') return v;
-  if (Array.isArray(v)) return v.map(fromConditions).find(Boolean) ?? null;
-  if (isRecord(v)) {
-    for (const key of ['types', 'import', 'module', 'default', 'require', 'node']) {
-      const r = fromConditions(v[key]);
-      if (r) return r;
-    }
-  }
-  return null;
-}
-
-const toDts = (p: string): string => p.replace(/\.(m|c)?jsx?$/, (_: string, k?: string) => `.d.${k ?? ''}ts`);
-
-/** Candidate type entry paths (relative, posix) in priority order. */
-export function entryCandidates(pkg: PackageJson): string[] {
-  const out: string[] = [];
-  const add = (p: string | null | undefined): void => {
-    if (p) out.push(p.replace(/^\.\//, ''));
-  };
-  const exp = pkg.exports;
-  if (exp) {
-    const root: unknown = !isRecord(exp) || !Object.keys(exp).some((k) => k.startsWith('.')) ? exp : exp['.'];
-    if (isRecord(root) && root['types']) add(fromConditions(root['types']));
-    add(fromConditions(root));
-  }
-  add(pkg.types);
-  add(pkg.typings);
-  if (pkg.main) {
-    add(pkg.main.replace(/\.[mc]?js$/, '') + '.d.ts');
-    add(pkg.main);
-  }
-  add('index.d.ts');
-  add('index.ts');
-  return [...new Set(out.flatMap((p) => (/\.[mc]?jsx?$/.test(p) ? [toDts(p), p.replace(/\.[mc]?jsx?$/, '.ts')] : [p])))];
+  /** Every module in the package, root first, one per subpath export. */
+  modules: ModuleApi[];
 }
 
 function collect(dir: string, root: string, files: Record<string, string>): void {
-  for (const name of readdirSync(dir)) {
+  for (const name of readdirSync(dir).sort()) {
     if (SKIP.has(name) || Object.keys(files).length >= MAX_FILES) continue;
     const full = join(dir, name);
     const st = statSync(full);
@@ -74,7 +41,7 @@ function collect(dir: string, root: string, files: Record<string, string>): void
   }
 }
 
-/** Extract the public API of the package in `dir`. Returns { name, version, entry, api }. */
+/** Extract the public API of every module of the package in `dir`. */
 export function extractPackage(dir: string): PackageApi {
   const root = resolve(dir);
   const pkgPath = join(root, 'package.json');
@@ -87,9 +54,14 @@ export function extractPackage(dir: string): PackageApi {
   }
   const files: Record<string, string> = {};
   collect(root, root, files);
-  const entry = entryCandidates(pkg).map((c) => '/' + c).find((c) => c in files);
-  if (!entry) {
+  const relFiles = new Set(Object.keys(files).map((f) => f.slice(1)));
+  const entries = resolveEntries(pkg, relFiles);
+  const first = entries[0];
+  if (!first) {
     throw new Error(`Could not find type declarations for ${pkg.name ?? root}. Set "types" in package.json or ship an index.d.ts.`);
   }
-  return { name: pkg.name ?? null, version: pkg.version ?? null, entry: entry.slice(1), api: extractApiFromFiles(files, entry) };
+  const modules = entries.map((e) => ({ subpath: e.subpath, entry: e.file, api: extractApiFromFiles(files, '/' + e.file) }));
+  const rootModule = modules.find((m) => m.subpath === '.') ?? modules[0];
+  if (!rootModule) throw new Error('unreachable: entries is non-empty');
+  return { name: pkg.name ?? null, version: pkg.version ?? null, entry: rootModule.entry, api: rootModule.api, modules };
 }

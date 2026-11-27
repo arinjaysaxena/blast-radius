@@ -1,0 +1,10 @@
+{
+  "name": "types-versions",
+  "version": "1.0.0",
+  "main": "lib/index.js",
+  "types": "types/legacy/index.d.ts",
+  "typesVersions": {
+    ">=4.0": { "*": ["types/modern/*"] },
+    "<4.0": { "*": ["types/legacy/*"] }
+  }
+}
