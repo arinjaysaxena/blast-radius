@@ -19,6 +19,7 @@ const find = (d: ApiChange[], name: string): ApiChange => {
 /** One scenario per rule: [rule, old source, new source, change name, breaking?]. */
 const SCENARIOS: [RuleId, string, string, string, boolean][] = [
   ['symbol-removed', 'export declare function f(): void', 'export declare const g: number', 'f', true],
+  ['symbol-renamed', 'export declare function fetchUser(id: string): string', 'export declare function fetchUsers(id: string): string', 'fetchUser', true],
   ['kind-changed', 'export declare function f(): void', 'export declare const f: number', 'f', true],
   ['parameter-added-required', 'export declare function f(a: string): void', 'export declare function f(a: string, b: number): void', 'f', true],
   ['parameter-removed', 'export declare function f(a: string, b: number): void', 'export declare function f(a: string): void', 'f', true],

@@ -5,6 +5,7 @@ import { kindOf } from '../extract/api.js';
 import type { LoadedPackage } from '../extract/package.js';
 import { VersionPair } from './compat.js';
 import { collectPositions, typeKey, type Position } from './position.js';
+import { RENAME_THRESHOLD, pairRenames, type RenameCandidate } from './rename.js';
 import { compareOverloads, signatureText, typeText, type Finding, type RuleId } from './signature.js';
 
 type Positions = Map<string, Set<Position>>;
@@ -13,6 +14,8 @@ interface Ctx {
   pair: VersionPair;
   positions: Positions;
   prefix: string;
+  /** `@deprecated` messages of symbols in the OLD version, by change name; used as a rename hint. */
+  deps: Map<string, string>;
 }
 
 const declOf = (s: ts.Symbol): ts.Node | undefined => s.valueDeclaration ?? s.declarations?.[0];
@@ -41,7 +44,11 @@ const isReadonly = (s: ts.Symbol): boolean => {
 function describe(pair: VersionPair, s: ts.Symbol, kind: ApiKind): string {
   const type = typeOfSymbol(pair, s);
   if (kind === 'function') return type.getCallSignatures().map((sig) => signatureText(pair, sig)).join(' | ');
-  if (kind === 'class' || kind === 'interface' || kind === 'type') return typeText(pair, pair.checker.getDeclaredTypeOfSymbol(s));
+  if (kind === 'class' || kind === 'interface') {
+    const props = pair.checker.getPropertiesOfType(pair.checker.getDeclaredTypeOfSymbol(s)).filter((p) => !isPrivate(p));
+    return `{ ${props.map((p) => `${p.name}${p.flags & ts.SymbolFlags.Optional ? '?' : ''}: ${typeText(pair, typeOfSymbol(pair, p))}`).join('; ')} }`;
+  }
+  if (kind === 'type') return typeText(pair, pair.checker.getDeclaredTypeOfSymbol(s));
   if (kind === 'enum') return `enum { ${[...(s.exports?.keys() ?? [])].join('; ')} }`;
   return typeText(pair, type);
 }
@@ -123,6 +130,8 @@ function compareMembers(ctx: Ctx, name: string, kind: ApiKind, o: ts.Symbol, n: 
     const nm = newM.get(key);
     const label = `${name}.${key}`;
     if (!nm) {
+      const dep = deprecation(pair, om.sym);
+      if (dep) ctx.deps.set(ctx.prefix + label, dep);
       out.push(entry(ctx, label, 'removed', 'variable', [{ rule: 'member-removed', reason: `member "${key}" removed` }], { old: typeText(pair, typeOfSymbol(pair, om.sym)) }));
       continue;
     }
@@ -196,6 +205,8 @@ function diffModule(ctx: Ctx, oldExports: Map<string, ts.Symbol>, newExports: Ma
     const n = newExports.get(name);
     if (!n) {
       const kind = kindOf(o);
+      const dep = deprecation(ctx.pair, o);
+      if (dep) ctx.deps.set(ctx.prefix + name, dep);
       out.push(entry(ctx, name, 'removed', kind, [{ rule: 'symbol-removed', reason: 'removed from the public API' }], { old: describe(ctx.pair, o, kind) }));
     } else out.push(...compareSymbol(ctx, name, o, n));
   }
@@ -205,6 +216,51 @@ function diffModule(ctx: Ctx, oldExports: Map<string, ts.Symbol>, newExports: Ma
     out.push(entry(ctx, name, 'added', kind, [], { new: describe(ctx.pair, n, kind) }));
   }
   return out;
+}
+
+/** Pair removed and added entries that look like renames, per owner (module scope or class/interface). */
+function applyRenames(ctx: Ctx, changes: ApiChange[]): ApiChange[] {
+  const ownerOf = (name: string): string => {
+    const rest = name.slice(ctx.prefix.length);
+    return rest.includes('.') ? rest.slice(0, rest.lastIndexOf('.')) : '';
+  };
+  const candidate = (c: ApiChange, shape: string | undefined): RenameCandidate => ({
+    name: c.name,
+    kind: c.kind,
+    shape: shape ?? '',
+    ...(ctx.deps.has(c.name) ? { deprecation: ctx.deps.get(c.name) } : {}),
+  });
+  const owners = new Set(changes.filter((c) => c.change === 'removed' || c.change === 'added').map((c) => ownerOf(c.name)));
+  const dropped = new Set<ApiChange>();
+  const renamed: ApiChange[] = [];
+  for (const owner of owners) {
+    const rem = changes.filter((c) => c.change === 'removed' && ownerOf(c.name) === owner);
+    const add = changes.filter((c) => c.change === 'added' && ownerOf(c.name) === owner);
+    const byName = new Map([...rem, ...add].map((c) => [c.name, c]));
+    const pairs = pairRenames(rem.map((c) => candidate(c, c.old)), add.map((c) => candidate(c, c.new)), RENAME_THRESHOLD);
+    for (const p of pairs) {
+      const from = byName.get(p.from);
+      const to = byName.get(p.to);
+      if (!from || !to) continue;
+      dropped.add(from);
+      dropped.add(to);
+      const target = to.name.slice(ctx.prefix.length);
+      renamed.push({
+        name: from.name,
+        change: 'renamed',
+        breaking: true,
+        kind: to.kind,
+        ...(from.old !== undefined ? { old: from.old } : {}),
+        ...(to.new !== undefined ? { new: to.new } : {}),
+        renamedTo: target,
+        confidence: p.confidence,
+        reasons: [`renamed to "${target}" (confidence ${p.confidence.toFixed(2)})`],
+        rules: ['symbol-renamed'],
+        ...(ctx.deps.has(from.name) ? { deprecated: ctx.deps.get(from.name) } : {}),
+      });
+    }
+  }
+  return [...changes.filter((c) => !dropped.has(c)), ...renamed];
 }
 
 /** Diff every module (subpath export) of two package versions with the type checker. Sorted by name. */
@@ -220,7 +276,8 @@ export function diffPackages(oldPkg: LoadedPackage, newPkg: LoadedPackage): ApiC
     const oldExports = of ? pair.exportsOf('old', of) : new Map<string, ts.Symbol>();
     const newExports = nf ? pair.exportsOf('new', nf) : new Map<string, ts.Symbol>();
     const positions = collectPositions(pair.checker, [...oldExports.values(), ...newExports.values()]);
-    out.push(...diffModule({ pair, positions, prefix }, oldExports, newExports));
+    const ctx: Ctx = { pair, positions, prefix, deps: new Map() };
+    out.push(...applyRenames(ctx, diffModule(ctx, oldExports, newExports)));
   }
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }

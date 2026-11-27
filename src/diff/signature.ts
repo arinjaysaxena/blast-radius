@@ -5,6 +5,7 @@ import type { VersionPair } from './compat.js';
 /** Every rule of the compatibility table; a golden test exists for each. */
 export const RULES = [
   'symbol-removed',
+  'symbol-renamed',
   'kind-changed',
   'parameter-added-required',
   'parameter-removed',

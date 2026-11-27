@@ -84,6 +84,8 @@ export interface ApiChange {
   reasons: string[];
   /** Ids from the compatibility rules table that fired (checker-based engine only). */
   rules?: string[];
+  /** 0..1 certainty that a `renamed` change really is a rename (checker-based engine only). */
+  confidence?: number;
   /** Deprecation message when the change is, or comes with, a new `@deprecated` tag. */
   deprecated?: string;
 }
