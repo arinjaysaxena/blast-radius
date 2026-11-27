@@ -1,6 +1,9 @@
 // Extract the public API (exported symbols + signatures) from TypeScript sources.
+import { readFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import ts from 'typescript';
 import type { ApiKind, ApiMap } from '../model/types.js';
+import { describeSymbol } from './details.js';
 
 const ENTRY = '/__entry__.ts';
 
@@ -8,7 +11,7 @@ const OPTIONS: ts.CompilerOptions = {
   target: ts.ScriptTarget.ES2022,
   module: ts.ModuleKind.ESNext,
   moduleResolution: ts.ModuleResolutionKind.Bundler,
-  noLib: true,
+  lib: ['lib.es2022.d.ts'],
   noResolve: true,
   skipLibCheck: true,
   strict: true,
@@ -74,7 +77,7 @@ function signatureOf(checker: ts.TypeChecker, symbol: ts.Symbol, node: ts.Node):
   return checker.typeToString(type, decl, flags);
 }
 
-function apiFromProgram(program: ts.Program, entry: string): ApiMap {
+function apiFromProgram(program: ts.Program, entry: string, packageName: string | null): ApiMap {
   const checker = program.getTypeChecker();
   const sf = program.getSourceFile(entry);
   const moduleSymbol = sf && checker.getSymbolAtLocation(sf);
@@ -82,21 +85,45 @@ function apiFromProgram(program: ts.Program, entry: string): ApiMap {
   if (!moduleSymbol) return api;
   for (const sym of checker.getExportsOfModule(moduleSymbol).sort((a, b) => a.name.localeCompare(b.name))) {
     const target = sym.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym) : sym;
-    api[sym.name] = { kind: kindOf(target), signature: signatureOf(checker, sym, sf) };
+    api[sym.name] = { kind: kindOf(target), signature: signatureOf(checker, sym, sf), ...describeSymbol(checker, target, sym, sf, packageName) };
+  }
+  // `export = x` makes the module itself the value; surface it so its call signature is not lost.
+  const equals = moduleSymbol.exports?.get(ts.InternalSymbolName.ExportEquals);
+  if (equals) {
+    const target = equals.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(equals) : equals;
+    api['export='] = { kind: kindOf(target), signature: signatureOf(checker, equals, sf), ...describeSymbol(checker, target, equals, sf, packageName) };
   }
   return api;
+}
+
+const LIB_DEFAULT = ts.getDefaultLibFilePath(OPTIONS);
+const LIB_DIR = dirname(LIB_DEFAULT);
+const libCache = new Map<string, ts.SourceFile>();
+
+/** Standard library declarations (Array, Promise, Map...) come from the installed compiler; everything else is in memory. */
+function libFile(name: string, lang: ts.ScriptTarget | ts.CreateSourceFileOptions): ts.SourceFile | undefined {
+  if (!name.startsWith(LIB_DIR) || !/\.d\.ts$/.test(name)) return undefined;
+  const hit = libCache.get(name);
+  if (hit) return hit;
+  try {
+    const sf = ts.createSourceFile(name, readFileSync(name, 'utf8'), lang);
+    libCache.set(name, sf);
+    return sf;
+  } catch {
+    return undefined;
+  }
 }
 
 function memoryProgram(all: Record<string, string>, options: ts.CompilerOptions): ts.CompilerHost {
   const host = ts.createCompilerHost(options);
   host.getSourceFile = (name, lang) => {
     const text = all[name];
-    return text === undefined ? undefined : ts.createSourceFile(name, text, lang, true);
+    return text === undefined ? libFile(name, lang) : ts.createSourceFile(name, text, lang, true);
   };
-  host.fileExists = (name) => name in all;
+  host.fileExists = (name) => name in all || libFile(name, ts.ScriptTarget.ES2022) !== undefined;
   host.readFile = (name) => all[name];
   host.directoryExists = (dir) => Object.keys(all).some((f) => f.startsWith(dir.endsWith('/') ? dir : `${dir}/`));
-  host.getDefaultLibFileName = () => '/lib.d.ts';
+  host.getDefaultLibFileName = () => LIB_DEFAULT;
   return host;
 }
 
@@ -104,15 +131,15 @@ function memoryProgram(all: Record<string, string>, options: ts.CompilerOptions)
  * Extract exports from TS source text. `files` may add extra modules ({ '/other.ts': '...' })
  * that the entry can import from. Returns { name: { kind, signature } } sorted by name.
  */
-export function extractApi(source: string, files: Record<string, string> = {}): ApiMap {
+export function extractApi(source: string, files: Record<string, string> = {}, packageName: string | null = null): ApiMap {
   const all = { ...files, [ENTRY]: source };
   const host = memoryProgram(all, OPTIONS);
-  return apiFromProgram(ts.createProgram({ rootNames: Object.keys(all), options: OPTIONS, host }), ENTRY);
+  return apiFromProgram(ts.createProgram({ rootNames: Object.keys(all), options: OPTIONS, host }), ENTRY, packageName);
 }
 
 /** Extract the API from in-memory files ({ '/index.d.ts': '...' }) starting at `entry`, resolving relative imports. */
-export function extractApiFromFiles(files: Record<string, string>, entry: string): ApiMap {
+export function extractApiFromFiles(files: Record<string, string>, entry: string, packageName: string | null = null): ApiMap {
   const options = { ...OPTIONS, noResolve: false };
   const host = memoryProgram(files, options);
-  return apiFromProgram(ts.createProgram({ rootNames: [entry], options, host }), entry);
+  return apiFromProgram(ts.createProgram({ rootNames: [entry], options, host }), entry, packageName);
 }

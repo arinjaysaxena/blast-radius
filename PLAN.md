@@ -16,8 +16,8 @@ Rules for v1:
 
 ## Milestone 2: real extraction (2026-11-28)
 - [x] Entry resolution: `exports` conditions and subpaths, `typesVersions`, `types`, `main` + sibling `.d.ts`; one module per subpath export
-- [ ] Resolve aliases and re-exports (`export *`, `export { a as b }`, `export =`); capture overloads, type params, members, enum values, JSDoc `@deprecated`
-- [ ] Fixture packages for each pattern under `test/fixtures/packages/`
+- [x] Resolve aliases and re-exports (`export *`, `export { a as b }`, `export =`); capture overloads, type params, members, enum values, JSDoc `@deprecated`
+- [x] Fixture packages for each pattern under `test/fixtures/packages/`
 
 ## Milestone 3: checker-based diff (2026-11-29)
 - [ ] Load old and new versions into one program under synthetic roots; wrap `isTypeAssignableTo` with a fallback and a guard test

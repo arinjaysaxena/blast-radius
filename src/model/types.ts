@@ -3,10 +3,68 @@
 /** Kinds of exported symbol the extractor distinguishes. */
 export type ApiKind = 'class' | 'function' | 'interface' | 'enum' | 'type' | 'variable' | 'namespace' | 'unknown';
 
-/** One exported symbol: its kind and a normalised signature string. */
+export interface ApiTypeParam {
+  name: string;
+  constraint?: string;
+  default?: string;
+}
+
+export interface ApiParameter {
+  name: string;
+  type: string;
+  optional: boolean;
+  rest: boolean;
+}
+
+/** One call or construct signature. */
+export interface ApiSignature {
+  /** Rendered signature, e.g. `<T>(input: T, strict?: boolean): string`. */
+  text: string;
+  construct: boolean;
+  typeParams: ApiTypeParam[];
+  parameters: ApiParameter[];
+  returnType: string;
+}
+
+export type MemberKind = 'property' | 'method' | 'accessor';
+export type Visibility = 'public' | 'protected';
+
+/** A property, method or accessor of a class or interface. */
+export interface ApiMember {
+  name: string;
+  qualifiedName: string;
+  kind: MemberKind;
+  type: string;
+  optional: boolean;
+  readonly: boolean;
+  static: boolean;
+  visibility: Visibility;
+  deprecated?: Deprecation;
+}
+
+export interface ApiEnumMember {
+  name: string;
+  /** Constant value, or `undefined` when it is computed. */
+  value?: string | number;
+}
+
+/** A JSDoc `@deprecated` tag; `message` is empty when the tag has no text. */
+export interface Deprecation {
+  message: string;
+}
+
+/** One exported symbol: its kind and a normalised signature string, plus structured detail. */
 export interface ApiSymbol {
   kind: ApiKind;
   signature: string;
+  /** `pkg#Name`; members extend it (`pkg#ZodString.email`). Absent when the package name is unknown. */
+  qualifiedName?: string;
+  signatures?: ApiSignature[];
+  typeParams?: ApiTypeParam[];
+  members?: ApiMember[];
+  enumMembers?: ApiEnumMember[];
+  deprecated?: Deprecation;
+  since?: string;
 }
 
 /** The public API of one package version, keyed by export name. */

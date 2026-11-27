@@ -60,7 +60,7 @@ export function extractPackage(dir: string): PackageApi {
   if (!first) {
     throw new Error(`Could not find type declarations for ${pkg.name ?? root}. Set "types" in package.json or ship an index.d.ts.`);
   }
-  const modules = entries.map((e) => ({ subpath: e.subpath, entry: e.file, api: extractApiFromFiles(files, '/' + e.file) }));
+  const modules = entries.map((e) => ({ subpath: e.subpath, entry: e.file, api: extractApiFromFiles(files, '/' + e.file, pkg.name ?? null) }));
   const rootModule = modules.find((m) => m.subpath === '.') ?? modules[0];
   if (!rootModule) throw new Error('unreachable: entries is non-empty');
   return { name: pkg.name ?? null, version: pkg.version ?? null, entry: rootModule.entry, api: rootModule.api, modules };
