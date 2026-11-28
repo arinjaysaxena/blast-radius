@@ -25,8 +25,8 @@ Rules for v1:
 - [x] Rename detection with confidence scoring; deprecation reporting
 
 ## Milestone 4: registry + cache (2026-11-30)
-- [ ] npm registry client honouring `.npmrc`, tarball download with sha512 integrity check, content-addressed cache
-- [ ] Automatic `@types/<name>` fallback; `file:` and local path specs
+- [x] npm registry client honouring `.npmrc`, tarball download with sha512 integrity check, content-addressed cache
+- [x] Automatic `@types/<name>` fallback; `file:` and local path specs
 - [ ] Port and delete the remaining JavaScript; repo is TypeScript only
 
 ## Milestone 5: usage scanner (2026-12-01)
