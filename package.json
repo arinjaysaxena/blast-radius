@@ -4,7 +4,7 @@
   "description": "",
   "type": "module",
   "bin": {
-    "blast-radius": "bin/blast-radius.js"
+    "blast-radius": "dist/cli.js"
   },
   "engines": {
     "node": ">=20"
@@ -29,7 +29,6 @@
   },
   "files": [
     "dist",
-    "bin",
     "action.yml"
   ],
   "main": "dist/index.cjs",

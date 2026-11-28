@@ -25,10 +25,10 @@ runs:
     - uses: actions/setup-node@v4
       with:
         node-version: 20
-    - run: npm install --omit=dev --no-audit --no-fund
+    - run: npm ci --no-audit --no-fund && npm run build
       shell: bash
       working-directory: ${{ github.action_path }}
-    - run: node "${{ github.action_path }}/bin/blast-radius-action.js"
+    - run: node "${{ github.action_path }}/dist/action.js"
       shell: bash
       env:
         INPUT_OLD: ${{ inputs.old }}

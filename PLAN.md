@@ -27,7 +27,7 @@ Rules for v1:
 ## Milestone 4: registry + cache (2026-11-30)
 - [x] npm registry client honouring `.npmrc`, tarball download with sha512 integrity check, content-addressed cache
 - [x] Automatic `@types/<name>` fallback; `file:` and local path specs
-- [ ] Port and delete the remaining JavaScript; repo is TypeScript only
+- [x] Port and delete the remaining JavaScript; repo is TypeScript only
 
 ## Milestone 5: usage scanner (2026-12-01)
 - [ ] tsconfig loading (paths, project references), JS projects via allowJs

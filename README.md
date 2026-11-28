@@ -18,8 +18,8 @@ Requires Node 20 or newer.
 
 ```sh
 git clone https://github.com/arinjaysaxena/blast-radius
-cd blast-radius && npm install
-node bin/blast-radius.js
+cd blast-radius && npm install && npm run build
+node dist/cli.js
 ```
 
 Run it with no arguments to print the usage line.
@@ -27,10 +27,10 @@ Run it with no arguments to print the usage line.
 ## Usage
 
 ```sh
-blast-radius <old> <new> [--project dir] [--format md|json] [--out file] [--fail-on-breaking]
+blast-radius <old> <new> [options]
 ```
 
-`<old>` and `<new>` are either package directories (with a `package.json` that points at its types) or npm specs such as `lodash@4.17.20`; specs are downloaded with `npm pack`.
+`<old>` and `<new>` are either package directories (with a `package.json` that points at its types) `file:` specs, or npm specs such as `lodash@4.17.20`. Specs are fetched from the registry configured in your `.npmrc` (including scoped registries and auth tokens), verified against their sha512 integrity, and kept in a content-addressed cache (`$XDG_CACHE_HOME/blast-radius`, `%LOCALAPPDATA%` on Windows), so repeat runs work offline. Packages without bundled types use the matching `@types/<name>` automatically.
 
 | Option | Meaning |
 | --- | --- |
@@ -38,6 +38,10 @@ blast-radius <old> <new> [--project dir] [--format md|json] [--out file] [--fail
 | `--format md\|json` | Markdown (default) or JSON report |
 | `--out file` | Write the report to a file instead of stdout |
 | `--fail-on-breaking` | Exit with status 1 when breaking changes are found |
+| `--offline` | Resolve specs from the local cache only |
+| `--no-types-fallback` | Do not look for `@types/<name>` when a package ships no types |
+| `--max-files n` | Scan at most `n` project files |
+| `-h, --help` | Print usage |
 
 ### Try it
 
@@ -48,7 +52,7 @@ echo '{"name":"acme-http","version":"2.0.0","types":"index.d.ts"}' > /tmp/br/new
 printf 'export function get(url: string): Promise<string>;\nexport function fetchJson(url: string): Promise<unknown>;\nexport function legacy(): void;\n' > /tmp/br/old/index.d.ts
 printf 'export function get(url: string, opts: { timeout: number }): Promise<string>;\nexport function getJson(url: string): Promise<unknown>;\n' > /tmp/br/new/index.d.ts
 printf "import { get, fetchJson, legacy } from 'acme-http';\nlegacy();\nfetchJson('/a');\nget('/b');\n" > /tmp/br/proj/src/app.ts
-node bin/blast-radius.js /tmp/br/old /tmp/br/new --project /tmp/br/proj
+node dist/cli.js /tmp/br/old /tmp/br/new --project /tmp/br/proj
 ```
 
 Output:
