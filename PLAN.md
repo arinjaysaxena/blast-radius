@@ -30,7 +30,7 @@ Rules for v1:
 - [x] Port and delete the remaining JavaScript; repo is TypeScript only
 
 ## Milestone 5: usage scanner (2026-12-01)
-- [ ] tsconfig loading (paths, project references), JS projects via allowJs
+- [x] tsconfig loading (paths, project references), JS projects via allowJs
 - [ ] Workspace discovery for npm, pnpm and yarn monorepos
 - [ ] Resolve imports, requires, subpaths and method chains back to package symbols; record call sites with argument info
 
