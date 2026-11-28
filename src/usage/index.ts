@@ -4,3 +4,5 @@ export { mapChangesToSites } from './map.js';
 export type { MappedChanges } from './map.js';
 export { ProjectError, createPrograms, loadProject, relPosix, syntheticOptions } from './project.js';
 export type { ConfigProgram, LoadedProject, LoadOptions, ProjectConfig } from './project.js';
+export { discoverWorkspaces, expandGlob, parsePnpmWorkspace, workspacePath, workspacesUsing } from './workspaces.js';
+export type { Workspace, WorkspaceLayout, WorkspaceManager } from './workspaces.js';

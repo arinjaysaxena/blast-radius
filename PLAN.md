@@ -31,7 +31,7 @@ Rules for v1:
 
 ## Milestone 5: usage scanner (2026-12-01)
 - [x] tsconfig loading (paths, project references), JS projects via allowJs
-- [ ] Workspace discovery for npm, pnpm and yarn monorepos
+- [x] Workspace discovery for npm, pnpm and yarn monorepos
 - [ ] Resolve imports, requires, subpaths and method chains back to package symbols; record call sites with argument info
 
 ## Milestone 6: virtual upgrade type-check (2026-12-02)
